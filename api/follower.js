@@ -1,5 +1,6 @@
-const cache = new Map();
-const CACHE_TTL = 30 * 1000;
+export const config = {
+  runtime: 'edge',
+};
 
 const HEADERS = {
   'User-Agent':
@@ -68,23 +69,23 @@ function isValidUsername(u) {
   return /^[a-z0-9._]{1,30}$/.test(u);
 }
 
-export default async function handler(req, res) {
-  const raw = (req.query?.username || '').toString().trim();
+function jsonResponse(status, data) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 's-maxage=30, stale-while-revalidate=60',
+    },
+  });
+}
+
+export default async function handler(request) {
+  const url = new URL(request.url);
+  const raw = (url.searchParams.get('username') || '').trim();
   const username = raw.replace(/^@/, '').toLowerCase();
 
-  if (!username) {
-    return res.status(400).json({ error: 'username required' });
-  }
-  if (!isValidUsername(username)) {
-    return res.status(400).json({ error: 'invalid username' });
-  }
-
-  const now = Date.now();
-  const cached = cache.get(username);
-  if (cached && now - cached.ts < CACHE_TTL) {
-    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
-    return res.status(200).json({ ...cached.data, cached: true });
-  }
+  if (!username) return jsonResponse(400, { error: 'username required' });
+  if (!isValidUsername(username)) return jsonResponse(400, { error: 'invalid username' });
 
   try {
     const response = await fetch(`https://www.instagram.com/${username}/`, {
@@ -93,10 +94,10 @@ export default async function handler(req, res) {
     });
 
     if (response.status === 404) {
-      return res.status(404).json({ error: 'user not found', username });
+      return jsonResponse(404, { error: 'user not found', username });
     }
     if (!response.ok) {
-      return res.status(502).json({
+      return jsonResponse(502, {
         error: `instagram returned ${response.status}`,
         username,
       });
@@ -106,23 +107,20 @@ export default async function handler(req, res) {
     const result = extractFollowers(html);
 
     if (!result) {
-      return res.status(503).json({
+      return jsonResponse(503, {
         error: 'could not parse follower count (instagram may have changed format or is blocking)',
         username,
       });
     }
 
-    const data = {
+    return jsonResponse(200, {
       username,
       followers: result.count,
       exact: result.exact,
       source: result.source,
-      ts: now,
-    };
-    cache.set(username, { data, ts: now });
-    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60');
-    return res.status(200).json(data);
+      ts: Date.now(),
+    });
   } catch (e) {
-    return res.status(500).json({ error: e.message || 'fetch failed', username });
+    return jsonResponse(500, { error: e.message || 'fetch failed', username });
   }
 }
