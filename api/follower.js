@@ -96,11 +96,33 @@ function jsonResponse(status, data) {
   });
 }
 
+function parseSetCookie(setCookieHeader) {
+  if (!setCookieHeader) return '';
+  const pairs = [];
+  setCookieHeader.split(/,(?=\s*[^;,\s]+=)/).forEach((c) => {
+    const m = c.trim().match(/^([^=]+=[^;]+)/);
+    if (m) pairs.push(m[1]);
+  });
+  return pairs.join('; ');
+}
+
 async function tryWebProfileInfo(username) {
+  let cookieStr = '';
+  try {
+    const warmup = await fetch(`https://www.instagram.com/${encodeURIComponent(username)}/`, {
+      headers: htmlHeaders(),
+      redirect: 'follow',
+    });
+    cookieStr = parseSetCookie(warmup.headers.get('set-cookie') || '');
+  } catch {}
+
+  const apiH = apiHeaders(username);
+  if (cookieStr) apiH.Cookie = cookieStr;
+
   const url = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`;
-  const r = await fetch(url, { headers: apiHeaders(username), redirect: 'follow' });
+  const r = await fetch(url, { headers: apiH, redirect: 'follow' });
   if (r.status === 404) return { notFound: true };
-  if (!r.ok) return { error: `web_profile_info status ${r.status}` };
+  if (!r.ok) return { error: `web_profile_info status ${r.status}`, hadCookies: !!cookieStr };
   const text = await r.text();
   const ext = extractFromText(text);
   if (ext) return { result: ext };
