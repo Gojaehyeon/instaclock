@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/api/follower",
-      "destination": "https://tourism-bottle-roses-certification.trycloudflare.com/api/follower"
-    }
-  ]
-}
