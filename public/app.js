@@ -4,7 +4,7 @@ const usernameInput = document.getElementById('username');
 const statusEl = document.getElementById('status');
 const themesEl = document.getElementById('themes');
 
-const MIN_DIGITS = 7;
+const MIN_DIGITS = 6;
 const POLL_INTERVAL = 30 * 1000;
 
 const THEMES = [
