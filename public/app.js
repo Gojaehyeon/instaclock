@@ -176,12 +176,37 @@ form.addEventListener('submit', (e) => {
   start(u);
 });
 
+let wakeLock = null;
+
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  if (wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => {
+      wakeLock = null;
+    });
+  } catch {}
+}
+
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && pollTimer) {
+  if (document.hidden) return;
+  acquireWakeLock();
+  if (pollTimer) {
     const u = usernameInput.value.trim().replace(/^@/, '').toLowerCase();
     if (u) poll(u);
   }
 });
+
+document.addEventListener(
+  'click',
+  () => {
+    acquireWakeLock();
+  },
+  { once: false }
+);
+
+acquireWakeLock();
 
 buildThemePicker();
 let savedTheme = 'cream';
