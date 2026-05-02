@@ -5,7 +5,7 @@ const statusEl = document.getElementById('status');
 const themesEl = document.getElementById('themes');
 
 const MIN_DIGITS = 6;
-const POLL_INTERVAL = 30 * 1000;
+const POLL_INTERVAL = 10 * 1000;
 
 const THEMES = [
   { id: 'cream', label: 'Cream', card: '#1d1d1d', digit: '#f0e0c0' },

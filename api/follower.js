@@ -91,7 +91,7 @@ function jsonResponse(status, data) {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'cache-control': 's-maxage=30, stale-while-revalidate=60',
+      'cache-control': 's-maxage=5, stale-while-revalidate=15',
     },
   });
 }
