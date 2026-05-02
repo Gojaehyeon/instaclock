@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>InstaClock</title>
+    <meta name="description" content="인스타그램 팔로워 실시간 플립 클락" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&family=Roboto+Mono:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <form id="form" autocomplete="off">
+        <span class="at">@</span>
+        <input
+          id="username"
+          type="text"
+          inputmode="text"
+          spellcheck="false"
+          autocapitalize="off"
+          autocorrect="off"
+          placeholder="username"
+          value="gojaehyun.go"
+        />
+        <button type="submit" aria-label="조회">↵</button>
+      </form>
+
+      <div id="board" class="board" aria-live="polite"></div>
+
+      <div id="status" class="status"></div>
+
+      <div id="themes" class="themes" role="radiogroup" aria-label="테마 선택"></div>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
