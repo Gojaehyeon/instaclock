@@ -5,6 +5,8 @@ export const config = {
 const GRAPH_VERSION = 'v21.0';
 const IG_TOKEN = process.env.IG_TOKEN;
 const IG_USERNAME = (process.env.IG_USERNAME || 'gojaehyun.go').toLowerCase();
+const PROXY_URL = process.env.INSTACLOCK_PROXY_URL;
+const PROXY_KEY = process.env.INSTACLOCK_KEY;
 
 function jsonResponse(status, data) {
   return new Response(JSON.stringify(data), {
@@ -32,17 +34,20 @@ async function fetchOwn() {
 }
 
 async function fetchOther(username) {
-  const fields = `business_discovery.username(${username}){username,followers_count}`;
-  const url = `https://graph.instagram.com/${GRAPH_VERSION}/me?fields=${encodeURIComponent(fields)}&access_token=${IG_TOKEN}`;
-  const r = await fetch(url);
+  if (!PROXY_URL || !PROXY_KEY) {
+    throw new Error('proxy not configured');
+  }
+  const base = PROXY_URL.replace(/\/$/, '');
+  const url = `${base}/follower?username=${encodeURIComponent(username)}`;
+  const r = await fetch(url, { headers: { 'x-api-key': PROXY_KEY } });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok || !data?.business_discovery) {
-    const msg = data?.error?.message || 'not a public business/creator account';
-    throw new Error(msg);
+  if (!r.ok) {
+    throw new Error(data?.error || `proxy ${r.status}`);
   }
   return {
-    username: data.business_discovery.username,
-    followers: data.business_discovery.followers_count,
+    username: data.username,
+    followers: data.followers,
+    source: data.source || 'scrape_residential',
   };
 }
 
@@ -63,10 +68,10 @@ export default async function handler(request) {
       username: result.username,
       followers: result.followers,
       exact: true,
-      source: 'graph_api',
+      source: result.source || 'graph_api',
       ts: Date.now(),
     });
   } catch (e) {
-    return jsonResponse(503, { error: e.message || 'graph api error', username });
+    return jsonResponse(503, { error: e.message || 'fetch error', username });
   }
 }
