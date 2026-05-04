@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>InstaClock 셋업</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #0a0a0a;
+        color: #f0e0c0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100dvh;
+        padding: 24px;
+      }
+      .card {
+        max-width: 420px;
+        width: 100%;
+        text-align: center;
+        padding: 32px;
+      }
+      h1 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        letter-spacing: -0.02em;
+      }
+      p {
+        color: #9a9a9a;
+        margin: 8px 0;
+        line-height: 1.55;
+        font-size: 15px;
+      }
+      small {
+        display: block;
+        color: #6a6a6a;
+        margin-top: 16px;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .login-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 32px;
+        padding: 14px 28px;
+        background: linear-gradient(45deg, #405DE6 0%, #5851DB 25%, #833AB4 50%, #C13584 75%, #E1306C 100%);
+        color: #fff;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 15px;
+        text-decoration: none;
+        cursor: pointer;
+        transition: filter 0.15s;
+      }
+      .login-btn:hover {
+        filter: brightness(1.12);
+      }
+      .device {
+        margin-top: 18px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        color: #6a6a6a;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>InstaClock</h1>
+      <p>인스타그램으로 로그인하면 본인 팔로워 수가 시계에 실시간 표시됩니다.</p>
+      <a class="login-btn" id="login">Instagram으로 로그인</a>
+      <small>인스타 계정이 <b>Business</b> 또는 <b>Creator</b> 모드여야 합니다.<br />
+        앱 → 설정 → 계정 종류 → 프로페셔널 전환 (무료, 외부엔 동일).</small>
+      <div class="device" id="device"></div>
+    </main>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const d = params.get('d') || '';
+      const link = document.getElementById('login');
+      link.href = '/api/oauth/start' + (d ? '?d=' + encodeURIComponent(d) : '');
+      if (d) {
+        document.getElementById('device').textContent = 'device: ' + d;
+      }
+    </script>
+  </body>
+</html>

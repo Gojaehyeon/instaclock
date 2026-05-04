@@ -1,3 +1,5 @@
+import { kv } from '../lib/kv.js';
+
 export const config = {
   runtime: 'edge',
 };
@@ -22,15 +24,19 @@ function isValidUsername(u) {
   return /^[a-z0-9._]{1,30}$/.test(u);
 }
 
-async function fetchOwn() {
-  const url = `https://graph.instagram.com/${GRAPH_VERSION}/me?fields=username,followers_count&access_token=${IG_TOKEN}`;
+async function fetchViaGraphApi(token) {
+  const url = `https://graph.instagram.com/${GRAPH_VERSION}/me?fields=username,followers_count&access_token=${token}`;
   const r = await fetch(url);
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
     const err = data?.error?.message || `graph api ${r.status}`;
     throw new Error(err);
   }
-  return { username: data.username, followers: data.followers_count };
+  return {
+    username: data.username,
+    followers: data.followers_count,
+    source: 'graph_api',
+  };
 }
 
 async function fetchOther(username) {
@@ -51,27 +57,44 @@ async function fetchOther(username) {
   };
 }
 
+async function resolveByDevice(deviceId) {
+  const dev = await kv.get(`device:${deviceId}`);
+  if (!dev?.igUserId) return null;
+  const rec = await kv.get(`ig:id:${dev.igUserId}`);
+  return rec?.token ? rec : null;
+}
+
 export default async function handler(request) {
   const url = new URL(request.url);
+  const deviceId = (url.searchParams.get('d') || '').trim();
   const raw = (url.searchParams.get('username') || '').trim();
   const username = raw.replace(/^@/, '').toLowerCase();
 
-  if (!username) return jsonResponse(400, { error: 'username required' });
-  if (!isValidUsername(username)) return jsonResponse(400, { error: 'invalid username' });
-  if (!IG_TOKEN) return jsonResponse(500, { error: 'IG_TOKEN env var not set' });
-
   try {
-    const result =
-      username === IG_USERNAME ? await fetchOwn() : await fetchOther(username);
+    if (deviceId) {
+      const rec = await resolveByDevice(deviceId);
+      if (!rec) return jsonResponse(404, { error: 'device not paired', deviceId });
+      const result = await fetchViaGraphApi(rec.token);
+      return jsonResponse(200, { ...result, exact: true, ts: Date.now() });
+    }
 
-    return jsonResponse(200, {
-      username: result.username,
-      followers: result.followers,
-      exact: true,
-      source: result.source || 'graph_api',
-      ts: Date.now(),
-    });
+    if (!username) return jsonResponse(400, { error: 'username or d required' });
+    if (!isValidUsername(username)) return jsonResponse(400, { error: 'invalid username' });
+
+    const rec = await kv.get(`ig:user:${username}`);
+    if (rec?.token) {
+      const result = await fetchViaGraphApi(rec.token);
+      return jsonResponse(200, { ...result, exact: true, ts: Date.now() });
+    }
+
+    if (username === IG_USERNAME && IG_TOKEN) {
+      const result = await fetchViaGraphApi(IG_TOKEN);
+      return jsonResponse(200, { ...result, exact: true, ts: Date.now() });
+    }
+
+    const result = await fetchOther(username);
+    return jsonResponse(200, { ...result, exact: true, ts: Date.now() });
   } catch (e) {
-    return jsonResponse(503, { error: e.message || 'fetch error', username });
+    return jsonResponse(503, { error: e.message || 'fetch error', username, deviceId });
   }
 }
