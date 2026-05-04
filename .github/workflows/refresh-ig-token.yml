@@ -14,7 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_SCOPE: gojaehyeons-projects
+      VERCEL_ORG_ID: team_nYcX7W1hfzHOQj3nhOx67oFL
+      VERCEL_PROJECT_ID: prj_GXgYbJiWnVX3oJqjWAQhwnQiOrDf
     steps:
       - name: Install Vercel CLI
         run: npm i -g vercel@latest
@@ -23,7 +24,7 @@ jobs:
         run: |
           vercel env pull .env.prod \
             --environment=production --yes \
-            --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
+            --token="$VERCEL_TOKEN"
 
       - name: Refresh long-lived token
         id: refresh
@@ -50,15 +51,12 @@ jobs:
       - name: Replace IG_TOKEN on Vercel
         run: |
           set -euo pipefail
-          vercel env rm IG_TOKEN production --yes \
-            --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
-          cat .new_token | vercel env add IG_TOKEN production \
-            --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
+          vercel env rm IG_TOKEN production --yes --token="$VERCEL_TOKEN"
+          cat .new_token | vercel env add IG_TOKEN production --token="$VERCEL_TOKEN"
 
       - name: Redeploy production
         run: |
-          vercel --prod --yes \
-            --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
+          vercel --prod --yes --token="$VERCEL_TOKEN"
 
       - name: Cleanup
         if: always()
