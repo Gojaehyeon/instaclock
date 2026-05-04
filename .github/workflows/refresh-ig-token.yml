@@ -17,6 +17,9 @@ jobs:
       VERCEL_ORG_ID: team_nYcX7W1hfzHOQj3nhOx67oFL
       VERCEL_PROJECT_ID: prj_GXgYbJiWnVX3oJqjWAQhwnQiOrDf
     steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
       - name: Install Vercel CLI
         run: npm i -g vercel@latest
 
