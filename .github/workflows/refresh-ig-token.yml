@@ -16,6 +16,8 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: team_nYcX7W1hfzHOQj3nhOx67oFL
       VERCEL_PROJECT_ID: prj_GXgYbJiWnVX3oJqjWAQhwnQiOrDf
+      ALIAS_PRIMARY: instaclock.gojaehyun.com
+      ALIAS_SECONDARY: insta.gojaehyun.com
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -26,40 +28,84 @@ jobs:
       - name: Pull current production env
         run: |
           vercel env pull .env.prod \
-            --environment=production --yes \
-            --token="$VERCEL_TOKEN"
+            --environment=production --yes --token="$VERCEL_TOKEN"
 
       - name: Refresh long-lived token
-        id: refresh
         run: |
           set -euo pipefail
           # shellcheck disable=SC1091
           source .env.prod
           if [ -z "${IG_TOKEN:-}" ]; then
-            echo "::error::IG_TOKEN missing in Vercel production env"
+            echo "::error::IG_TOKEN missing or empty in Vercel production env"
             exit 1
           fi
           resp=$(curl -sS -m 15 \
             "https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${IG_TOKEN}")
-          new_token=$(printf '%s' "$resp" | jq -r '.access_token // empty')
-          expires_in=$(printf '%s' "$resp" | jq -r '.expires_in // empty')
+          new_token=$(printf '%s' "$resp" | jq -j '.access_token // empty')
+          expires_in=$(printf '%s' "$resp" | jq -j '.expires_in // empty')
           if [ -z "$new_token" ]; then
             echo "::error::refresh failed: $resp"
             exit 1
           fi
+          echo "::add-mask::$new_token"
           printf '%s' "$new_token" > .new_token
-          echo "expires_in=$expires_in" >> "$GITHUB_OUTPUT"
           echo "Token refreshed. New TTL: $((expires_in / 86400)) days"
 
-      - name: Replace IG_TOKEN on Vercel
+      - name: Replace IG_TOKEN via Vercel API
         run: |
           set -euo pipefail
-          vercel env rm IG_TOKEN production --yes --token="$VERCEL_TOKEN"
-          cat .new_token | vercel env add IG_TOKEN production --token="$VERCEL_TOKEN"
+          new_token=$(cat .new_token)
+          api="https://api.vercel.com"
+          q="teamId=$VERCEL_ORG_ID"
+          auth="Authorization: Bearer $VERCEL_TOKEN"
+
+          env_id=$(curl -sS "$api/v9/projects/$VERCEL_PROJECT_ID/env?$q" \
+            -H "$auth" \
+            | jq -r '.envs[] | select(.key=="IG_TOKEN" and (.target | index("production"))) | .id' \
+            | head -1)
+
+          if [ -n "$env_id" ]; then
+            curl -sS -X DELETE "$api/v9/projects/$VERCEL_PROJECT_ID/env/$env_id?$q" \
+              -H "$auth" > /dev/null
+          fi
+
+          jq -nc --arg v "$new_token" \
+            '{key:"IG_TOKEN",value:$v,type:"encrypted",target:["production"]}' \
+          | curl -sS -X POST "$api/v10/projects/$VERCEL_PROJECT_ID/env?$q" \
+              -H "$auth" -H "Content-Type: application/json" --data @- \
+              | jq -e '.created.key=="IG_TOKEN"' > /dev/null
+
+          echo "✓ IG_TOKEN replaced via API"
 
       - name: Redeploy production
+        id: deploy
         run: |
-          vercel --prod --yes --token="$VERCEL_TOKEN"
+          set -euo pipefail
+          deploy_out=$(vercel --prod --yes --token="$VERCEL_TOKEN" 2>&1)
+          echo "$deploy_out"
+          url=$(printf '%s\n' "$deploy_out" \
+            | grep -oE 'https://instaclock-[a-z0-9]+-gojaehyeons-projects\.vercel\.app' \
+            | head -1)
+          if [ -z "$url" ]; then
+            echo "::error::could not parse deploy URL"
+            exit 1
+          fi
+          echo "host=${url#https://}" >> "$GITHUB_OUTPUT"
+
+      - name: Update aliases
+        run: |
+          set -euo pipefail
+          host="${{ steps.deploy.outputs.host }}"
+          vercel alias set "$host" "$ALIAS_PRIMARY" --token="$VERCEL_TOKEN"
+          vercel alias set "$host" "$ALIAS_SECONDARY" --token="$VERCEL_TOKEN"
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          sleep 4
+          resp=$(curl -sS -m 15 "https://$ALIAS_PRIMARY/api/follower?username=gojaehyun.go")
+          echo "$resp"
+          echo "$resp" | jq -e '.followers > 0 and .source=="graph_api"' > /dev/null
 
       - name: Cleanup
         if: always()
